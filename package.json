@@ -1,0 +1,20 @@
+{
+  "name": "dflower-bot-discord",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon --watch './**/*.ts' --exec 'ts-node' index.ts",
+    "start": "pm2 start 'ts-node index.ts' --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.1.2",
+    "dotenv": "^16.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19",
+    "ts-node": "^10.9.1"
+  }
+}
