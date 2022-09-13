@@ -5,9 +5,8 @@ import { config } from 'dotenv'
 import { ProxyAgent } from 'undici'
 import dflowerCommand, { buttonHandler, commandHandler, modalSubmitHandler } from './commands/dflower'
 
-
-config()
-const CLIENT_ID = process.env.CLIENT_ID
+const env = config().parsed
+const CLIENT_ID = env.CLIENT_ID
 
 const client = new Client({
   intents: [
@@ -17,9 +16,9 @@ const client = new Client({
 })
 
 
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN)
+const rest = new REST({ version: '10' }).setToken(env.TOKEN)
 
-if (process.env.env === 'dev') {
+if (env.env === 'dev') {
   const agent = new ProxyAgent({
     uri: 'http://127.0.0.1:1087',
   })
@@ -32,28 +31,25 @@ client.on('ready', () => {
   console.log(`Logged in as ${client?.user?.tag}!`)
 })
 
-// TODO save room and roomID => users to db
-const users: User[] = []
-
 client.on('interactionCreate', async (interaction) => {
 
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === dflowerCommand.name) {
-      return commandHandler(interaction, users, client)
+      return await commandHandler(interaction, client)
     }
   }
 
   if (interaction.isButton()) {
-    return buttonHandler(interaction, users)
+    return await buttonHandler(interaction)
   }
 
   if (interaction.type === InteractionType.ModalSubmit) {
-    return modalSubmitHandler(interaction)
+    return await modalSubmitHandler(interaction)
   }
 })
 
 client.on('error', error => {
-  console.error('client error', error.message)
+  console.error('client error', error)
 })
 
 
@@ -68,5 +64,5 @@ async function main() {
   }
 }
 main()
-console.log('token:', process.env.TOKEN.slice(65, 72))
-client.login(process.env.TOKEN).catch(console.error)
+console.log('token:', env.TOKEN.slice(65, 72))
+client.login(env.TOKEN).catch(console.error)

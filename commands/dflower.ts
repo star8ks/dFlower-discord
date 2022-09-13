@@ -1,4 +1,6 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, MessageMentions, ModalBuilder, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
+import { NexusGenObjects } from '../lib'
+import { queryGifterOnRoom, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
   .setName('dflower')
@@ -18,40 +20,80 @@ const dflowerCommand = new SlashCommandBuilder()
   )
 
 // TODO handle re submit points
-export const modalSubmitHandler = async function (interaction) {
-  if (interaction.customId !== 'modal') return
+export const modalSubmitHandler = async function (interaction: ModalSubmitInteraction) {
+  if (!interaction.customId.startsWith('modal')) return
+
+  // 'modal-' + interaction.user.id + '-' + roomID
+  const idParts = interaction.customId.split('#')
+  const roomId = idParts[idParts.length - 1]
+  const senderDiscordId = interaction.user.id
+
+  const gifters = await queryGifterOnRoom(roomId)
+  const gifter = gifters.find(g => g.gifter.discordId === senderDiscordId)
+  const senderId = gifter.gifter.id
+  console.log('new modal submit:', { roomId, gifter: gifter.gifter.name })
 
   const points = interaction.fields.fields.map(field => {
     // TODO field.value must be integer
     const idParts = field.customId.split('-')
-    const id = idParts[idParts.length - 1]
+    const receiverDiscordId = idParts[idParts.length - 1]
     console.log(idParts)
+    const point = parseInt(field.value.trim(), 10) || 0
 
     return {
-      id,
-      point: field.value
+      point,
+      receiverDiscordId,
+      receiverId: discordId2GifterId(receiverDiscordId),
+      roomId,
+      senderDiscordId
     }
   })
   console.log(points)
 
+  const res = await updatePointBatch(points.map(p => {
+    return {
+      roomId,
+      point: p.point,
+      receiverId: p.receiverId,
+      senderId: senderId
+    }
+  }))
+
   const pointsStr = points.reduce((str, current) => {
-    return str + `<@${current.id}>` + `: ${current.point}\n`
+    const percent = res.normalized.find(n => n.receiverId === current.receiverId).percent
+    return str + `<@${current.receiverDiscordId}>` + `: ${current.point} [${Math.floor(percent * 100)}%]\n`
   }, '')
   await interaction.reply({
     ephemeral: true,
     content: '您的评分已提交：\n' + pointsStr
+      + '\n感谢您的参与！\n'
+      + '您可以在互评结束后查看结果。\n'
+      + 'room ID： ' + roomId
+
   })
+
+  function discordId2GifterId(discordId: string) {
+    return gifters.find(g => g.gifter.discordId === discordId).gifter.id
+  }
 }
 
-const startEmbed = (startUserID: string, users: User[]) => {
+function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'][], roomID = null) {
   let members = ''
-  for (const user of users) {
-    members += `<@${user.id}> `
+  for (const gifter of gifters) {
+    console.log('user discordId in embed', gifter.gifter.discordId)
+    members += `<@${gifter.gifter.discordId}> `
   }
+
+  let description = (roomID ? `房间ID：${roomID}\n` : '')
+  description += `发起人：<@${startUserID}>
+互评时间：2小时
+
+**成员**${members}`
+
   return new EmbedBuilder({
-    'title': '发起互评',
-    'description': `发起人：<@${startUserID}>\n互评时间：2小时\n\n**成员**\n` + members,
-    'color': 0x00FFFF
+    title: '发起互评',
+    description,
+    color: 0x00FFFF
   })
 }
 
@@ -70,16 +112,17 @@ function getUsersFromMention(mention: string) {
   return matches
 }
 
-export const commandHandler = async function(interaction, users, client) {
+export const commandHandler = async function (interaction, client) {
 
-  console.log(interaction.options.data, interaction.options.getString('members'))
+  console.log('command triggered:', interaction.options.data, interaction.options.getString('members'))
   const mention = interaction.options.getString('members')
 
   const matches = getUsersFromMention(mention)
 
+  const users = []
   for (const match of matches) {
-    console.log(match)
     const id = match[1]
+    console.log('mentioned id:', id)
     users.push(client.users.cache.get(id))
   }
 
@@ -105,14 +148,18 @@ export const commandHandler = async function(interaction, users, client) {
     return
   }
 
+  const room = await startRoom('', interaction.user.id, interaction.user.tag, users)
+  console.log('==========room created==========', room, room.gifters)
+
   const actionRowComponent = new ActionRowBuilder<ButtonBuilder>().setComponents(
     new ButtonBuilder().setCustomId('cancel').setLabel('取消').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('confirm').setLabel('确定').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('confirm#' + room.id).setLabel('确定').setStyle(ButtonStyle.Primary)
   )
+
   // show preview
   await interaction.reply({
     ephemeral: true,
-    embeds: [startEmbed(interaction.user.id, users)],
+    embeds: [startEmbed(interaction.user.id, room.gifters, room.id)],
     components: [actionRowComponent],
     target: interaction.user
   })
@@ -120,7 +167,7 @@ export const commandHandler = async function(interaction, users, client) {
   return
 }
 
-export const buttonHandler = async function (interaction, users) {
+export const buttonHandler = async function (interaction: ButtonInteraction) {
   if (interaction.customId === 'cancel') {
     // TODO can not cancel if it already started
     await interaction.reply({
@@ -132,18 +179,21 @@ export const buttonHandler = async function (interaction, users) {
     })
   }
 
-  if (interaction.customId === 'confirm') {
+  if (interaction.customId.startsWith('confirm')) {
     console.log('started a new review session', interaction.id)
+
+    const roomID = interaction.customId.split('#').slice(1)[0]
+    const gifters = await queryGifterOnRoom(roomID)
 
     await interaction.reply({
       ephemeral: false,
-      embeds: [startEmbed(interaction.user.id, users)],
+      embeds: [startEmbed(interaction.user.id, gifters, roomID)],
       components: [{
         type: 1,
         components: [{
           style: ButtonStyle.Primary,
           label: '参与互评',
-          custom_id: 'start',
+          custom_id: 'start' + '#' + roomID,
           disabled: false,
           type: ComponentType.Button
         }]
@@ -153,9 +203,17 @@ export const buttonHandler = async function (interaction, users) {
   }
 
   // todo customId start with 'start' and followed by room id
-  if (interaction.customId === 'start') {
-    console.log(users.map(user => user.id), interaction.user.id)
-    if (users.findIndex(user => user.id === interaction.user.id) < 0) {
+  if (interaction.customId.startsWith('start')) {
+    const idParts = interaction.customId.split('#')
+    const roomID = idParts[idParts.length - 1]
+    const gifters = await queryGifterOnRoom(roomID)
+    const userIDs = idParts[0].split('-').slice(1)
+    const indexOfUser = gifters.findIndex(gifter => {
+      return gifter.gifter.discordId === interaction.user.id
+    })
+    console.log('started a new review session', roomID)
+
+    if (indexOfUser < 0) {
       await interaction.reply({
         ephemeral: true,
         embeds: [new EmbedBuilder({
@@ -166,12 +224,14 @@ export const buttonHandler = async function (interaction, users) {
     }
 
     const modal = new ModalBuilder()
-      .setCustomId('modal')
+      .setCustomId('modal#' + roomID)
       .setTitle('互评')
 
-    for (const user of users) {
+    for (const gifter of gifters) {
       modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
-        new TextInputBuilder().setLabel(user.tag).setCustomId('point-' + user.id).setRequired(true).setStyle(TextInputStyle.Short)
+        new TextInputBuilder().setLabel(gifter.gifter.name)
+          .setCustomId('point-' + gifter.gifter.discordId)
+          .setRequired(true).setStyle(TextInputStyle.Short)
       ))
     }
 
