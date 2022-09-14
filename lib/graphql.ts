@@ -84,7 +84,52 @@ export const updatePointBatchMutation = gql`
   }
 `
 
-export async function queryRoomGifters(roomId: string): Promise<NexusGenFieldTypes['Room']> {
+export const getRoomResult = gql`
+  query getRoomById($roomId: String!) {
+    roomById(id: $roomId) {
+      id
+      name
+      endedAt
+      tempResult{
+        # allGifted{
+        #   ...
+        # }
+        result{
+          receiverId
+          receiverDiscordId
+          receiverName
+          percent
+        }
+      }
+      gifters {
+        accept
+        gifter {
+          id
+          name
+          discordId
+          ethAddress
+        }
+      }
+    }
+  }
+`
+
+// TODO add return type
+export async function queryRoomResult(roomId: string) {
+  const data = await gqlClientPost.request(getRoomResult, {
+    roomId,
+  })
+
+  return data.roomById
+}
+
+
+type RoomGifters = {
+  endedAt: NexusGenFieldTypes['Room']['endedAt']
+  gifters: NexusGenObjects['GifterOnRoom'][]
+}
+
+export async function queryRoomGifters(roomId: string): Promise<RoomGifters> {
   const data = await gqlClientPost.request(queryGiftersByRoomId, {
     roomId,
   })

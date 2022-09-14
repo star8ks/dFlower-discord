@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
 import { NexusGenObjects } from '../lib'
-import { queryRoomGifters, startRoom, updatePointBatch } from '../lib/graphql'
+import { queryRoomGifters, queryRoomResult, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
   .setName('dflower')
@@ -187,6 +187,23 @@ async function checkEndAndReply(roomEndedAt, interaction) {
   return false
 }
 
+async function checkEndAndReplyResult(room, interaction) {
+  if (parseInt(room.endedAt, 10) <= Date.now()) {
+    const description = room.tempResult.result.reduce((str, result) => {
+      return str + `<@${result.receiverDiscordId}>: ${Math.floor(result.percent * 100)}%\n`
+    }, '')
+    await interaction.reply({
+      ephemeral: true,
+      embeds: [new EmbedBuilder({
+        title: '活动已结束，结果如下',
+        description: description + '\n房间 ID：' + room.id
+      })]
+    })
+    return true
+  }
+  return false
+}
+
 export const buttonHandler = async function (interaction: ButtonInteraction) {
   if (interaction.customId === 'cancel') {
     // TODO can not cancel if it is already started
@@ -227,9 +244,9 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
   if (interaction.customId.startsWith('start')) {
     const idParts = interaction.customId.split('#')
     const roomId = idParts[idParts.length - 1]
-    const room = await queryRoomGifters(roomId)
+    const room = await queryRoomResult(roomId)
 
-    if (await checkEndAndReply(room.endedAt, interaction)) return
+    if (await checkEndAndReplyResult(room, interaction)) return
 
     const gifters = room.gifters
     const userIDs = idParts[0].split('-').slice(1)
