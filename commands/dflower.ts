@@ -6,15 +6,15 @@ const dflowerCommand = new SlashCommandBuilder()
   .setName('dflower')
   .setDescription('Start a peer review session')
   .setDescriptionLocalizations({
-    'zh-CN': '开启一次小红花互评',
-    'zh-TW': '開啟一次小紅花互評'
+    'zh-CN': '开启一次小红花活动',
+    'zh-TW': '開啟一次小紅花活動',
   })
   .addStringOption(option =>
     option.setName('members')
       .setDescription('metion all members participating in the session')
       .setDescriptionLocalizations({
-        'zh-CN': '@所有参与互评的成员',
-        'zh-TW': '@所有參與互評的成員'
+        'zh-CN': '@所有参与活动的成员',
+        'zh-TW': '@所有參與活动的成員'
       })
       .setRequired(true)
   )
@@ -48,7 +48,7 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
       senderDiscordId
     }
   })
-  console.log(points)
+  console.log(`points submmited:`, points)
 
   const res = await updatePointBatch(points.map(p => {
     return {
@@ -58,17 +58,21 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
       senderId: senderId
     }
   }))
+  console.log('updatePointBatch res', res)
 
   const pointsStr = points.reduce((str, current) => {
-    const percent = res.normalized.find(n => n.receiverId === current.receiverId).percent
-    return str + `<@${current.receiverDiscordId}>` + `: ${current.point} [${Math.floor(percent * 100)}%]\n`
+    const normalized = res.normalized.find(n => n.receiverId === current.receiverId)
+    if (!normalized) return str
+
+    return str + `<@${current.receiverDiscordId}>`
+      + `: ${current.point} [${Math.floor(normalized.percent * 100)}%]\n`
   }, '')
   await interaction.reply({
     ephemeral: true,
-    content: '您的评分已提交：\n' + pointsStr
+    content: '提交成功：\n' + pointsStr
       + '\n感谢您的参与！\n'
-      + '您可以在互评结束后查看结果。\n'
-      + 'room ID： ' + roomId
+      + '您可以在活动结束后查看结果。\n'
+      + '房间 ID： ' + roomId
 
   })
 
@@ -86,12 +90,12 @@ function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'
 
   let description = (roomID ? `房间ID：${roomID}\n` : '')
   description += `发起人：<@${startUserID}>
-互评时间：2小时
+活动时间：2小时
 
 **成员**${members}`
 
   return new EmbedBuilder({
-    title: '发起互评',
+    title: (roomID ? '' : '发起') + '小红花活动',
     description,
     color: 0x00FFFF
   })
@@ -131,7 +135,7 @@ export const commandHandler = async function (interaction, client) {
       ephemeral: true,
       embeds: [new EmbedBuilder({
         title: '发起失败',
-        description: '参与互评的总人数最低为3位'
+        description: '参与活动的总人数最低为3位'
       })],
     })
     return
@@ -142,7 +146,7 @@ export const commandHandler = async function (interaction, client) {
       ephemeral: true,
       embeds: [new EmbedBuilder({
         title: '发起失败',
-        description: '暂不支持超过5人的互评'
+        description: '暂不支持超过5人的活动'
       })],
     })
     return
@@ -159,7 +163,7 @@ export const commandHandler = async function (interaction, client) {
   // show preview
   await interaction.reply({
     ephemeral: true,
-    embeds: [startEmbed(interaction.user.id, room.gifters, room.id)],
+    embeds: [startEmbed(interaction.user.id, room.gifters)],
     components: [actionRowComponent],
     target: interaction.user
   })
@@ -173,7 +177,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
     await interaction.reply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
-        'title': '互评已关闭',
+        'title': '活动已关闭',
         // 'description': ''
       })]
     })
@@ -192,7 +196,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
         type: 1,
         components: [{
           style: ButtonStyle.Primary,
-          label: '参与互评',
+          label: '点击参与小红花',
           custom_id: 'start' + '#' + roomID,
           disabled: false,
           type: ComponentType.Button
@@ -217,7 +221,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
       await interaction.reply({
         ephemeral: true,
         embeds: [new EmbedBuilder({
-          'title': '您不在此次互评范围内',
+          'title': '您不在此次活动范围内',
         })]
       })
       return
@@ -225,13 +229,17 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
 
     const modal = new ModalBuilder()
       .setCustomId('modal#' + roomID)
-      .setTitle('互评')
+      .setTitle('小红花')
 
     for (const gifter of gifters) {
+      if (gifter.gifter.discordId === interaction.user.id) continue
+
       modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder().setLabel(gifter.gifter.name)
           .setCustomId('point-' + gifter.gifter.discordId)
           .setRequired(true).setStyle(TextInputStyle.Short)
+          .setMinLength(1).setMaxLength(3)
+          .setPlaceholder(`请输入给 ${gifter.gifter.name} 分配的比例`)
       ))
     }
 
