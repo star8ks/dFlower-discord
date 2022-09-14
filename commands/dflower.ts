@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
 import { NexusGenObjects } from '../lib'
-import { queryGifterOnRoom, startRoom, updatePointBatch } from '../lib/graphql'
+import { queryRoomGifters, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
   .setName('dflower')
@@ -19,16 +19,18 @@ const dflowerCommand = new SlashCommandBuilder()
       .setRequired(true)
   )
 
-// TODO handle re submit points
 export const modalSubmitHandler = async function (interaction: ModalSubmitInteraction) {
   if (!interaction.customId.startsWith('modal')) return
 
   // 'modal-' + interaction.user.id + '-' + roomID
   const idParts = interaction.customId.split('#')
-  const roomId = idParts[idParts.length - 1]
   const senderDiscordId = interaction.user.id
+  const roomId = idParts[idParts.length - 1]
+  const room = await queryRoomGifters(roomId)
 
-  const gifters = await queryGifterOnRoom(roomId)
+  if (await checkEndAndReply(room.endedAt, interaction)) return
+
+  const gifters = room.gifters
   const gifter = gifters.find(g => g.gifter.discordId === senderDiscordId)
   const senderId = gifter.gifter.id
   console.log('new modal submit:', { roomId, gifter: gifter.gifter.name })
@@ -69,7 +71,7 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
   }, '')
   await interaction.reply({
     ephemeral: true,
-    content: '提交成功：\n' + pointsStr
+    content: '🎉 提交成功 🎉\n' + pointsStr
       + '\n感谢您的参与！\n'
       + '您可以在活动结束后查看结果。\n'
       + '房间 ID： ' + roomId
@@ -81,21 +83,21 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
   }
 }
 
-function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'][], roomID = null) {
+function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'][], roomId = null) {
   let members = ''
   for (const gifter of gifters) {
     console.log('user discordId in embed', gifter.gifter.discordId)
     members += `<@${gifter.gifter.discordId}> `
   }
 
-  let description = (roomID ? `房间ID：${roomID}\n` : '')
+  let description = (roomId ? `房间ID：${roomId}\n` : '')
   description += `发起人：<@${startUserID}>
-活动时间：2小时
+活动时间：30分钟
 
 **成员**${members}`
 
   return new EmbedBuilder({
-    title: (roomID ? '' : '发起') + '小红花活动',
+    title: (roomId ? '🌺 ' : '发起') + '小红花活动',
     description,
     color: 0x00FFFF
   })
@@ -171,13 +173,27 @@ export const commandHandler = async function (interaction, client) {
   return
 }
 
-export const buttonHandler = async function (interaction: ButtonInteraction) {
-  if (interaction.customId === 'cancel') {
-    // TODO can not cancel if it already started
+async function checkEndAndReply(roomEndedAt, interaction) {
+  if (parseInt(roomEndedAt, 10) <= Date.now()) {
     await interaction.reply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
-        'title': '活动已关闭',
+        'title': '🙃 活动已结束',
+        // 'description': ''
+      })]
+    })
+    return true
+  }
+  return false
+}
+
+export const buttonHandler = async function (interaction: ButtonInteraction) {
+  if (interaction.customId === 'cancel') {
+    // TODO can not cancel if it is already started
+    await interaction.reply({
+      ephemeral: true,
+      embeds: [new EmbedBuilder({
+        'title': '👌 活动已关闭',
         // 'description': ''
       })]
     })
@@ -186,18 +202,20 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
   if (interaction.customId.startsWith('confirm')) {
     console.log('started a new review session', interaction.id)
 
-    const roomID = interaction.customId.split('#').slice(1)[0]
-    const gifters = await queryGifterOnRoom(roomID)
+    const roomId = interaction.customId.split('#').slice(1)[0]
+    const room = await queryRoomGifters(roomId)
+
+    if (await checkEndAndReply(room.endedAt, interaction)) return
 
     await interaction.reply({
       ephemeral: false,
-      embeds: [startEmbed(interaction.user.id, gifters, roomID)],
+      embeds: [startEmbed(interaction.user.id, room.gifters, roomId)],
       components: [{
         type: 1,
         components: [{
           style: ButtonStyle.Primary,
-          label: '点击参与小红花',
-          custom_id: 'start' + '#' + roomID,
+          label: '点击参与小红花 🌺',
+          custom_id: 'start' + '#' + roomId,
           disabled: false,
           type: ComponentType.Button
         }]
@@ -206,29 +224,32 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
     return
   }
 
-  // todo customId start with 'start' and followed by room id
   if (interaction.customId.startsWith('start')) {
     const idParts = interaction.customId.split('#')
-    const roomID = idParts[idParts.length - 1]
-    const gifters = await queryGifterOnRoom(roomID)
+    const roomId = idParts[idParts.length - 1]
+    const room = await queryRoomGifters(roomId)
+
+    if (await checkEndAndReply(room.endedAt, interaction)) return
+
+    const gifters = room.gifters
     const userIDs = idParts[0].split('-').slice(1)
     const indexOfUser = gifters.findIndex(gifter => {
       return gifter.gifter.discordId === interaction.user.id
     })
-    console.log('started a new review session', roomID)
+    console.log('started a new review session', roomId)
 
     if (indexOfUser < 0) {
       await interaction.reply({
         ephemeral: true,
         embeds: [new EmbedBuilder({
-          'title': '您不在此次活动范围内',
+          'title': '🤷 您不在此次活动范围内',
         })]
       })
       return
     }
 
     const modal = new ModalBuilder()
-      .setCustomId('modal#' + roomID)
+      .setCustomId('modal#' + roomId)
       .setTitle('小红花')
 
     for (const gifter of gifters) {

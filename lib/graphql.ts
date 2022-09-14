@@ -17,6 +17,7 @@ export const gqlClientPost = new GraphQLClient(env.dFlowerEndpoint, {
 export const queryGiftersByRoomId = gql`
   query giftersByRoomId($roomId: String!) {
     roomById(id: $roomId) {
+      endedAt
       gifters {
         accept
         gifter {
@@ -83,12 +84,12 @@ export const updatePointBatchMutation = gql`
   }
 `
 
-export async function queryGifterOnRoom(roomId: string): Promise<NexusGenObjects['GifterOnRoom'][]> {
+export async function queryRoomGifters(roomId: string): Promise<NexusGenFieldTypes['Room']> {
   const data = await gqlClientPost.request(queryGiftersByRoomId, {
     roomId,
   })
 
-  return data.roomById.gifters
+  return data.roomById
 }
 
 export async function startRoom(roomName, discordId, discordName, gifters: User[]): Promise<NexusGenFieldTypes['Room']> {
