@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
-import { NexusGenObjects } from '../lib'
+import { NexusGenFieldTypes, NexusGenObjects } from '../lib'
 import { queryRoomGifters, queryRoomResult, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
@@ -11,12 +11,51 @@ const dflowerCommand = new SlashCommandBuilder()
   })
   .addStringOption(option =>
     option.setName('members')
-      .setDescription('metion all members participating in the session')
+      .setDescription('Metion all members participating in the session')
       .setDescriptionLocalizations({
         'zh-CN': '@所有参与活动的成员',
         'zh-TW': '@所有參與活动的成員'
       })
       .setRequired(true)
+  )
+  // duration in minutes
+  .addIntegerOption(option =>
+    option.setName('duration')
+      .setDescription('Duration of the session in minutes')
+      .setDescriptionLocalizations({
+        'zh-CN': '活动时长（分钟）',
+        'zh-TW': '活動時長（分鐘）'
+      })
+      .setRequired(true)
+      .setChoices({
+        name: '5 minutes',
+        name_localizations: {
+          'zh-CN': '5分钟',
+          'zh-TW': '5分鐘'
+        },
+        value: 5
+      }, {
+        name: '10 minutes',
+        name_localizations: {
+          'zh-CN': '10分钟',
+          'zh-TW': '10分鐘'
+        },
+        value: 10
+      }, {
+        name: '15 minutes',
+        name_localizations: {
+          'zh-CN': '15分钟',
+          'zh-TW': '15分鐘'
+        },
+        value: 15
+      }, {
+        name: '30 minutes',
+        name_localizations: {
+          'zh-CN': '30分钟',
+          'zh-TW': '30分鐘'
+        },
+        value: 30
+      })
   )
 
 export const modalSubmitHandler = async function (interaction: ModalSubmitInteraction) {
@@ -71,7 +110,7 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
   }, '')
   await interaction.reply({
     ephemeral: true,
-    content: '🎉 提交成功 🎉\n' + pointsStr
+    content: '🎉 提交成功 🎉\n\n' + pointsStr
       + '\n感谢您的参与！\n'
       + '您可以在活动结束后查看结果。\n'
       + '房间 ID： ' + roomId
@@ -83,7 +122,7 @@ export const modalSubmitHandler = async function (interaction: ModalSubmitIntera
   }
 }
 
-function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'][], roomId = null) {
+function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'][], endedAt: NexusGenFieldTypes['Room']['endedAt'], roomId?: NexusGenFieldTypes['Room']['id']) {
   let members = ''
   for (const gifter of gifters) {
     console.log('user discordId in embed', gifter.gifter.discordId)
@@ -92,7 +131,7 @@ function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'
 
   let description = (roomId ? `房间ID：${roomId}\n` : '')
   description += `发起人：<@${startUserID}>
-活动时间：30分钟
+结束时间：${new Date(parseInt(endedAt, 10)).toLocaleString()}
 
 **成员**${members}`
 
@@ -154,7 +193,8 @@ export const commandHandler = async function (interaction, client) {
     return
   }
 
-  const room = await startRoom('', interaction.user.id, interaction.user.tag, users)
+  const duration = interaction.options.getInteger('duration')
+  const room = await startRoom('', interaction.user.id, interaction.user.tag, duration, users)
   console.log('==========room created==========', room, room.gifters)
 
   const actionRowComponent = new ActionRowBuilder<ButtonBuilder>().setComponents(
@@ -165,7 +205,7 @@ export const commandHandler = async function (interaction, client) {
   // show preview
   await interaction.reply({
     ephemeral: true,
-    embeds: [startEmbed(interaction.user.id, room.gifters)],
+    embeds: [startEmbed(interaction.user.id, room.gifters, room.endedAt)],
     components: [actionRowComponent],
     target: interaction.user
   })
@@ -190,8 +230,10 @@ async function checkEndAndReply(roomEndedAt, interaction) {
 async function checkEndAndReplyResult(room, interaction) {
   if (parseInt(room.endedAt, 10) <= Date.now()) {
     const description = room.tempResult.result.reduce((str, result) => {
-      return str + `<@${result.receiverDiscordId}>: ${Math.floor(result.percent * 100)}%\n`
+      return str + `<@${result.receiverDiscordId}>: ${result.percent.toFixed(4) * 100}%\n`
     }, '')
+
+    console.log('room endded. result:', room.tempResult.result)
     await interaction.reply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
@@ -226,7 +268,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
 
     await interaction.reply({
       ephemeral: false,
-      embeds: [startEmbed(interaction.user.id, room.gifters, roomId)],
+      embeds: [startEmbed(interaction.user.id, room.gifters, room.endedAt, room.id)],
       components: [{
         type: 1,
         components: [{
