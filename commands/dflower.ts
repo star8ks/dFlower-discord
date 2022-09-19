@@ -28,13 +28,6 @@ const dflowerCommand = new SlashCommandBuilder()
       })
       .setRequired(true)
       .setChoices({
-        name: '5 minutes',
-        name_localizations: {
-          'zh-CN': '5分钟',
-          'zh-TW': '5分鐘'
-        },
-        value: 5
-      }, {
         name: '10 minutes',
         name_localizations: {
           'zh-CN': '10分钟',
@@ -55,6 +48,34 @@ const dflowerCommand = new SlashCommandBuilder()
           'zh-TW': '30分鐘'
         },
         value: 30
+      }, {
+        name: '1 hours',
+        name_localizations: {
+          'zh-CN': '1小时',
+          'zh-TW': '1小時'
+        },
+        value: 60
+      }, {
+        name: '2 hours',
+        name_localizations: {
+          'zh-CN': '2小时',
+          'zh-TW': '2小時'
+        },
+        value: 120
+      }, {
+        name: '8 hours',
+        name_localizations: {
+          'zh-CN': '8小时',
+          'zh-TW': '8小時'
+        },
+        value: 480
+      }, {
+        name: '24 hours',
+        name_localizations: {
+          'zh-CN': '24小时',
+          'zh-TW': '24小時'
+        },
+        value: 1440
       })
   )
 
@@ -129,11 +150,12 @@ function startEmbed(startUserID: string, gifters: NexusGenObjects['GifterOnRoom'
     members += `<@${gifter.gifter.discordId}> `
   }
 
-  let description = (roomId ? `房间ID：${roomId}\n` : '')
+  let description = (roomId ? `房间 ID：${roomId}\n` : '')
   description += `发起人：<@${startUserID}>
 结束时间：${new Date(parseInt(endedAt, 10)).toLocaleString()}
 
-**成员**${members}`
+`
+  description += roomId ? `请 ${members} 点击下方按钮给其他成员送出小红花。每人总共可送出 **100** 朵小红花（不足或超过100朵将按比例折算）。活动结束后将按综合所有人送出的小红花计算最终结果。` : `参与成员：${members}`
 
   return new EmbedBuilder({
     title: (roomId ? '🌺 ' : '发起') + '小红花活动',
@@ -230,7 +252,7 @@ async function checkEndAndReply(roomEndedAt, interaction) {
 async function checkEndAndReplyResult(room, interaction) {
   if (parseInt(room.endedAt, 10) <= Date.now()) {
     const description = room.tempResult.result.reduce((str, result) => {
-      return str + `<@${result.receiverDiscordId}>: ${result.percent.toFixed(4) * 100}%\n`
+      return str + `<@${result.receiverDiscordId}>: ${(result.percent * 100).toFixed(2)}%\n`
     }, '')
 
     console.log('room endded. result:', room.tempResult.result)
@@ -273,7 +295,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
         type: 1,
         components: [{
           style: ButtonStyle.Primary,
-          label: '点击参与小红花 🌺',
+          label: '点击参与 🌺',
           custom_id: 'start' + '#' + roomId,
           disabled: false,
           type: ComponentType.Button
@@ -319,7 +341,7 @@ export const buttonHandler = async function (interaction: ButtonInteraction) {
           .setCustomId('point-' + gifter.gifter.discordId)
           .setRequired(true).setStyle(TextInputStyle.Short)
           .setMinLength(1).setMaxLength(3)
-          .setPlaceholder(`请输入给 ${gifter.gifter.name} 分配的比例`)
+          .setPlaceholder(`请输入送给 ${gifter.gifter.name} 的小红花数量`)
       ))
     }
 
