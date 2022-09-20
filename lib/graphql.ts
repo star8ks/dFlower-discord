@@ -1,12 +1,12 @@
 import { GraphQLClient, gql } from 'graphql-request'
-
-// load env variables
 import { config } from 'dotenv'
+
+config()
+// load env variables
 import { NexusGenFieldTypeNames, NexusGenFieldTypes, NexusGenInputs, NexusGenObjects, NexusGenRootTypes } from '.'
 import { User } from 'discord.js'
-const env = config().parsed
 
-export const gqlClientPost = new GraphQLClient(env.D_FLOWER_ENDPOINT, {
+export const gqlClientPost = new GraphQLClient(process.env.D_FLOWER_ENDPOINT, {
   method: 'POST',
   jsonSerializer: {
     parse: JSON.parse,

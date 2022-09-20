@@ -5,8 +5,8 @@ import { config } from 'dotenv'
 import { ProxyAgent } from 'undici'
 import dflowerCommand, { buttonHandler, commandHandler, modalSubmitHandler } from './commands/dflower'
 
-const env = config().parsed
-const CLIENT_ID = env.CLIENT_ID
+config()
+const CLIENT_ID = process.env.CLIENT_ID
 
 const client = new Client({
   intents: [
@@ -16,9 +16,9 @@ const client = new Client({
 })
 
 
-const rest = new REST({ version: '10' }).setToken(env.TOKEN)
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN)
 
-if (env.ENV === 'dev') {
+if (process.env.ENV === 'dev') {
   const agent = new ProxyAgent({
     uri: 'http://127.0.0.1:1087',
   })
@@ -64,5 +64,5 @@ async function main() {
   }
 }
 main()
-console.log('token:', env.TOKEN.slice(65, 72))
-client.login(env.TOKEN).catch(console.error)
+console.log('token:', process.env.TOKEN.slice(65, 72))
+client.login(process.env.TOKEN).catch(console.error)
