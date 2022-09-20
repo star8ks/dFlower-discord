@@ -18,7 +18,7 @@ const client = new Client({
 
 const rest = new REST({ version: '10' }).setToken(env.TOKEN)
 
-if (env.env === 'dev') {
+if (env.ENV === 'dev') {
   const agent = new ProxyAgent({
     uri: 'http://127.0.0.1:1087',
   })

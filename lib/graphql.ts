@@ -6,7 +6,7 @@ import { NexusGenFieldTypeNames, NexusGenFieldTypes, NexusGenInputs, NexusGenObj
 import { User } from 'discord.js'
 const env = config().parsed
 
-export const gqlClientPost = new GraphQLClient(env.dFlowerEndpoint, {
+export const gqlClientPost = new GraphQLClient(env.D_FLOWER_ENDPOINT, {
   method: 'POST',
   jsonSerializer: {
     parse: JSON.parse,

@@ -257,7 +257,7 @@ async function checkEndAndReplyResult(room, interaction) {
 
     console.log('room endded. result:', room.tempResult.result)
     await interaction.reply({
-      ephemeral: true,
+      ephemeral: false,
       embeds: [new EmbedBuilder({
         title: '活动已结束，结果如下',
         description: description + '\n房间 ID：' + room.id
