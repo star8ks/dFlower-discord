@@ -1,9 +1,9 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Client, ComponentType, EmbedBuilder, Interaction, InteractionResponse, MessageMentions, ModalBuilder, ModalSubmitInteraction, SlashCommandBuilder, TextInputBuilder, TextInputStyle, User } from 'discord.js'
 import { NexusGenFieldTypes, NexusGenObjects } from '../lib'
 import { queryRoomGifters, queryRoomResult, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
-  .setName('dflower')
+  .setName(process.env.ENV === 'dev' ? 'df' : 'dflower')
   .setDescription('Start a peer review session')
   .setDescriptionLocalizations({
     'zh-CN': '开启一次小红花活动',
@@ -179,17 +179,18 @@ function getUsersFromMention(mention: string) {
   return matches
 }
 
-export const commandHandler = async function (interaction, client) {
+export const commandHandler = async function (interaction, client: Client) {
 
   console.log('command triggered:', interaction.options.data, interaction.options.getString('members'))
   const mention = interaction.options.getString('members')
 
   const matches = getUsersFromMention(mention)
 
-  const users = []
+  const users: User[] = []
   for (const match of matches) {
     const id = match[1]
     console.log('mentioned id:', id)
+    if (users.find(u => u.id === id)) continue
     users.push(client.users.cache.get(id))
   }
 
