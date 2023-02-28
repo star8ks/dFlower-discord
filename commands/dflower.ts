@@ -3,7 +3,7 @@ import { NexusGenFieldTypes, NexusGenObjects } from '../lib'
 import { queryRoomGifters, queryRoomResult, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
-  .setName(process.env.ENV === 'dev' ? 'df' : 'dflower')
+  .setName(process.env.ENV === 'dev' ? 'po' : 'pom')
   .setDescription('Start a peer review session')
   .setDescriptionLocalizations({
     'zh-CN': '开启一次小红花活动',
@@ -180,6 +180,7 @@ function getUsersFromMention(mention: string) {
 }
 
 export const commandHandler = async function (interaction, client: Client) {
+  await interaction.deferReply({ ephemeral: true });
 
   console.log('command triggered:', interaction.options.data, interaction.options.getString('members'))
   const mention = interaction.options.getString('members')
@@ -205,12 +206,12 @@ export const commandHandler = async function (interaction, client: Client) {
     return
   }
 
-  if (users.length > 5) {
+  if (users.length > 6) {
     await interaction.reply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
         title: '发起失败',
-        description: '暂不支持超过5人的活动'
+        description: '暂不支持超过6人的活动'
       })],
     })
     return
