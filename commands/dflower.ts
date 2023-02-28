@@ -196,7 +196,7 @@ export const commandHandler = async function (interaction, client: Client) {
   }
 
   if (users.length < 3) {
-    await interaction.reply({
+    await interaction.editReply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
         title: '发起失败',
@@ -207,7 +207,7 @@ export const commandHandler = async function (interaction, client: Client) {
   }
 
   if (users.length > 6) {
-    await interaction.reply({
+    await interaction.editReply({
       ephemeral: true,
       embeds: [new EmbedBuilder({
         title: '发起失败',
@@ -227,7 +227,7 @@ export const commandHandler = async function (interaction, client: Client) {
   )
 
   // show preview
-  await interaction.reply({
+  await interaction.editReply({
     ephemeral: true,
     embeds: [startEmbed(interaction.user.id, room.gifters, room.endedAt)],
     components: [actionRowComponent],
