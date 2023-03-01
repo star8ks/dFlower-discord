@@ -180,7 +180,7 @@ function getUsersFromMention(mention: string) {
 }
 
 export const commandHandler = async function (interaction, client: Client) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ ephemeral: true })
 
   console.log('command triggered:', interaction.options.data, interaction.options.getString('members'))
   const mention = interaction.options.getString('members')
