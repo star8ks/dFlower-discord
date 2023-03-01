@@ -218,22 +218,33 @@ export const commandHandler = async function (interaction, client: Client) {
   }
 
   const duration = interaction.options.getInteger('duration')
-  const room = await startRoom('', interaction.user.id, interaction.user.tag, duration, users)
-  console.log('==========room created==========', room, room.gifters)
 
-  const actionRowComponent = new ActionRowBuilder<ButtonBuilder>().setComponents(
-    new ButtonBuilder().setCustomId('cancel').setLabel('取消').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('confirm#' + room.id).setLabel('确定').setStyle(ButtonStyle.Primary)
-  )
+  try {
+    const room = await startRoom('', interaction.user.id, interaction.user.tag, duration, users)
+    console.log('==========room created==========', room, room.gifters)
 
-  // show preview
-  await interaction.editReply({
-    ephemeral: true,
-    embeds: [startEmbed(interaction.user.id, room.gifters, room.endedAt)],
-    components: [actionRowComponent],
-    target: interaction.user
-  })
+    const actionRowComponent = new ActionRowBuilder<ButtonBuilder>().setComponents(
+      new ButtonBuilder().setCustomId('cancel').setLabel('取消').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('confirm#' + room.id).setLabel('确定').setStyle(ButtonStyle.Primary)
+    )
 
+    // show preview
+    await interaction.editReply({
+      ephemeral: true,
+      embeds: [startEmbed(interaction.user.id, room.gifters, room.endedAt)],
+      components: [actionRowComponent],
+      target: interaction.user
+    })
+  } catch (e: any) {
+    console.error(e)
+    await interaction.editReply({
+      ephemeral: true,
+      embeds: [new EmbedBuilder({
+        title: '发起失败',
+        description: e.message
+      })],
+    })
+  }
   return
 }
 
