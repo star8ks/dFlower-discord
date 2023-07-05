@@ -3,7 +3,7 @@ import { NexusGenFieldTypes, NexusGenObjects } from '../lib'
 import { queryRoomGifters, queryRoomResult, startRoom, updatePointBatch } from '../lib/graphql'
 
 const dflowerCommand = new SlashCommandBuilder()
-  .setName(process.env.ENV === 'dev' ? 'po' : 'pom')
+  .setName(process.env.ENV === 'dev' ? 'df' : 'pom')
   .setDescription('Start a peer review session')
   .setDescriptionLocalizations({
     'zh-CN': '开启一次小红花活动',
