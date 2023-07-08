@@ -277,7 +277,7 @@ async function checkEndAndReplyResult(room, interaction) {
         title: '活动已结束，结果如下',
         description: `${description}
 房间 ID：${room.id}
-查看[明细](${origin}/result?id=${room.id})
+[查看明细](${origin}/result?id=${room.id})
 `
       })]
     })
