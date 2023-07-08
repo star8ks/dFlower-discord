@@ -18,9 +18,10 @@ const client = new Client({
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN)
 
-if (process.env.ENV === 'dev') {
+if (process.env.PROXY) {
+  console.log('Using proxy agent')
   const agent = new ProxyAgent({
-    uri: 'http://127.0.0.1:1087',
+    uri: process.env.PROXY,
   })
 
   client.rest.setAgent(agent)
@@ -35,16 +36,19 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === dflowerCommand.name) {
-      return await commandHandler(interaction, client)
+      await commandHandler(interaction, client)
+      return
     }
   }
 
   if (interaction.isButton()) {
-    return await buttonHandler(interaction)
+    await buttonHandler(interaction)
+    return
   }
 
   if (interaction.type === InteractionType.ModalSubmit) {
-    return await modalSubmitHandler(interaction)
+    await modalSubmitHandler(interaction)
+    return
   }
 })
 

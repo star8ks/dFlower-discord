@@ -268,12 +268,17 @@ async function checkEndAndReplyResult(room, interaction) {
       return str + `<@${result.receiverDiscordId}>: ${(result.percent * 100).toFixed(2)}%\n`
     }, '')
 
+    const origin = new URL(process.env.D_FLOWER_ENDPOINT).origin
+
     console.log('room endded. result:', room.tempResult.result)
     await interaction.reply({
       ephemeral: false,
       embeds: [new EmbedBuilder({
         title: '活动已结束，结果如下',
-        description: description + '\n房间 ID：' + room.id
+        description: `${description}
+房间 ID：${room.id}
+查看[明细](${origin}/result?id=${room.id})
+`
       })]
     })
     return true
